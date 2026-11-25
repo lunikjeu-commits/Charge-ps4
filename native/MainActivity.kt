@@ -11,6 +11,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        Historique.init(applicationContext)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "lc/manette")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -25,6 +26,15 @@ class MainActivity : FlutterActivity() {
                         result.success(true)
                     }
                     "serviceActif" -> result.success(ManetteService.actif)
+                    "getReglages" -> result.success(Reglages.lire(this))
+                    "setReglages" -> {
+                        Reglages.ecrire(this, call.arguments as Map<*, *>)
+                        result.success(true)
+                    }
+                    "getHistorique" -> result.success(mapOf(
+                        "points" to Historique.points().map { listOf(it.t, it.n) },
+                        "reste" to Historique.resteMinutes()
+                    ))
                     else -> result.notImplemented()
                 }
             }
