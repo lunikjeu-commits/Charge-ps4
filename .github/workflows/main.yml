@@ -24,8 +24,8 @@ jobs:
           cp -r lib app/lib
           D=app/android/app/src/main/kotlin/com/lunikapp/manette_batterie
           mkdir -p $D
-          cp native/MainActivity.kt $D/MainActivity.kt
-          sed -i 's/android:label="[^"]*"/android:label="Batterie Manette"/' app/android/app/src/main/AndroidManifest.xml
+          cp native/*.kt $D/
+          cp native/AndroidManifest.xml app/android/app/src/main/AndroidManifest.xml
       - name: Build APK
         working-directory: app
         run: flutter build apk --release
