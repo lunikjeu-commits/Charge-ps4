@@ -12,12 +12,14 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   List<Manette> _liste = [];
+  bool _suivi = false;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     _actualiser();
+    _basculer(true);
     _timer = Timer.periodic(const Duration(seconds: 5), (_) => _actualiser());
   }
 
@@ -32,12 +34,21 @@ class _HomePageState extends State<HomePage> {
     if (mounted) setState(() => _liste = l);
   }
 
+  Future<void> _basculer(bool v) async {
+    if (v) {
+      await BatteryService.demarrerSuivi();
+    } else {
+      await BatteryService.arreterSuivi();
+    }
+    if (mounted) setState(() => _suivi = v);
+  }
+
   void _apropos() {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('À propos'),
-        content: const Text('Batterie Manette v1.0\nCréé par lunikapp\nLC STUDIO'),
+        content: const Text('Batterie Manette v1.1\nCréé par lunikapp\nLC STUDIO'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))
         ],
@@ -68,15 +79,22 @@ class _HomePageState extends State<HomePage> {
                 IconButton(onPressed: _apropos, icon: const Icon(Icons.info_outline)),
               ]),
             ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: SwitchListTile(
+                value: _suivi,
+                onChanged: _basculer,
+                title: const Text('Suivi dans la barre d\'état'),
+                subtitle: const Text('Icône + % en haut, alerte à 20 % et 10 %'),
+              ),
+            ),
             Expanded(
               child: RefreshIndicator(
                 onRefresh: _actualiser,
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(20),
-                  children: _liste.isEmpty
-                      ? [_vide()]
-                      : _liste.map(_carte).toList(),
+                  children: _liste.isEmpty ? [_vide()] : _liste.map(_carte).toList(),
                 ),
               ),
             ),
@@ -87,7 +105,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _vide() => Padding(
-        padding: const EdgeInsets.only(top: 80),
+        padding: const EdgeInsets.only(top: 60),
         child: Column(children: [
           Icon(Icons.sports_esports_rounded, size: 80, color: Colors.white.withOpacity(0.3)),
           const SizedBox(height: 16),
