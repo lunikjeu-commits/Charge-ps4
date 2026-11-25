@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'battery_gauge.dart';
 import 'battery_service.dart';
+import 'historique_chart.dart';
+import 'reglages_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -12,14 +14,16 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   List<Manette> _liste = [];
-  bool _suivi = false;
+  Historique _histo = const Historique([], null);
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
+    BatteryService.lireReglages().then((r) {
+      if (r.auto) BatteryService.demarrerSuivi();
+    });
     _actualiser();
-    _basculer(true);
     _timer = Timer.periodic(const Duration(seconds: 5), (_) => _actualiser());
   }
 
@@ -31,24 +35,27 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _actualiser() async {
     final l = await BatteryService.lire();
-    if (mounted) setState(() => _liste = l);
+    final h = await BatteryService.lireHistorique();
+    if (mounted) {
+      setState(() {
+        _liste = l;
+        _histo = h;
+      });
+    }
   }
 
-  Future<void> _basculer(bool v) async {
-    if (v) {
-      await BatteryService.demarrerSuivi();
-    } else {
-      await BatteryService.arreterSuivi();
-    }
-    if (mounted) setState(() => _suivi = v);
-  }
+  String _fmt(int min) =>
+      min >= 60 ? '${min ~/ 60} h ${(min % 60).toString().padLeft(2, '0')}' : '$min min';
+
+  void _reglages() =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const ReglagesPage()));
 
   void _apropos() {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('À propos'),
-        content: const Text('Batterie Manette v1.1\nCréé par lunikapp\nLC STUDIO'),
+        content: const Text('Batterie Manette v1.2\nCréé par lunikapp\nLC STUDIO'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))
         ],
@@ -76,17 +83,9 @@ class _HomePageState extends State<HomePage> {
                   child: Text('Batterie manette',
                       style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
                 ),
+                IconButton(onPressed: _reglages, icon: const Icon(Icons.tune_rounded)),
                 IconButton(onPressed: _apropos, icon: const Icon(Icons.info_outline)),
               ]),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: SwitchListTile(
-                value: _suivi,
-                onChanged: _basculer,
-                title: const Text('Suivi dans la barre d\'état'),
-                subtitle: const Text('Icône + % en haut, alerte à 20 % et 10 %'),
-              ),
             ),
             Expanded(
               child: RefreshIndicator(
@@ -94,7 +93,9 @@ class _HomePageState extends State<HomePage> {
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(20),
-                  children: _liste.isEmpty ? [_vide()] : _liste.map(_carte).toList(),
+                  children: _liste.isEmpty
+                      ? [_vide()]
+                      : _liste.asMap().entries.map((e) => _carte(e.value, e.key == 0)).toList(),
                 ),
               ),
             ),
@@ -118,7 +119,28 @@ class _HomePageState extends State<HomePage> {
         ]),
       );
 
-  Widget _carte(Manette m) {
+  Widget _estimation(Manette m) {
+    final r = _histo.reste;
+    final texte = (m.enCharge || m.pleine)
+        ? 'Pas d\'estimation pendant la charge'
+        : r != null
+            ? '≈ ${_fmt(r)} de jeu restantes'
+            : 'Estimation disponible après quelques minutes de jeu';
+    return Padding(
+      padding: const EdgeInsets.only(top: 18),
+      child: Column(children: [
+        Text(texte, style: TextStyle(color: Colors.white.withOpacity(0.8))),
+        if (_histo.points.length >= 2)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: HistoriqueChart(
+                points: _histo.points, couleur: BatteryGauge.couleur(m.niveau / 100)),
+          ),
+      ]),
+    );
+  }
+
+  Widget _carte(Manette m, bool premiere) {
     final ok = m.supporte && m.niveau >= 0;
     return Card(
       color: Colors.white.withOpacity(0.06),
@@ -140,11 +162,7 @@ class _HomePageState extends State<HomePage> {
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white.withOpacity(0.7)),
             ),
-          if (ok && m.pleine)
-            const Padding(
-              padding: EdgeInsets.only(top: 12),
-              child: Text('Batterie pleine'),
-            ),
+          if (ok && premiere) _estimation(m),
         ]),
       ),
     );
