@@ -31,4 +31,16 @@ class BatteryService {
       return [];
     }
   }
+
+  static Future<void> demarrerSuivi() async {
+    try {
+      await _canal.invokeMethod('startService');
+    } catch (_) {}
+  }
+
+  static Future<void> arreterSuivi() async {
+    try {
+      await _canal.invokeMethod('stopService');
+    } catch (_) {}
+  }
 }
